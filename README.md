@@ -72,7 +72,7 @@ rustup install stable
 Clone the repository:
 
 ```bash
-git clone https://github.com/yourusername/gravity.git
+git clone https://github.com/iuhmirza/gravity.git
 cd gravity
 ```
 
