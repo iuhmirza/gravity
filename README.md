@@ -1,3 +1,7 @@
+Here is an updated **README.md** with a dedicated **Performance Considerations & Optimization Opportunities** section added.
+
+---
+
 # Gravity 🌌
 
 **Gravity** is a work-in-progress disk usage analyzer written in Rust.
@@ -91,14 +95,128 @@ Scanning
 
 ---
 
+# ⚡ Performance Considerations & Optimization Opportunities
+
+Gravity is designed to scale, but there are important performance considerations in its current implementation.
+
+## 🔒 Lock Contention
+
+All entries are pushed into a shared:
+
+```rust
+Arc<Mutex<BinaryHeap<Entry>>>
+```
+
+This means:
+
+* Every file and directory requires acquiring a mutex lock.
+* Large directory trees may cause significant lock contention.
+* Concurrency benefits can be reduced due to synchronization overhead.
+
+### Potential Improvements
+
+* Use a lock-free or sharded structure
+* Maintain thread-local heaps and merge at the end
+* Use a bounded heap that only keeps top N entries
+* Replace `Mutex` with `RwLock` if appropriate
+
+---
+
+## 📈 Unbounded Memory Growth
+
+Currently:
+
+* Every file and directory is pushed into the heap
+* Memory usage grows with filesystem size
+
+For very large drives, this can consume substantial RAM.
+
+### Potential Improvements
+
+* Maintain a fixed-size min-heap of top N elements
+* Stream results instead of storing all entries
+* Add size threshold filtering
+
+---
+
+## 🧵 Task Spawning Overhead
+
+Each subdirectory spawns a new async task using `JoinSet`.
+
+In very deep or wide directory trees:
+
+* Task creation overhead increases
+* Scheduler pressure increases
+* Stack growth and future boxing adds cost
+
+### Potential Improvements
+
+* Use a bounded task pool
+* Switch to iterative traversal with a work queue
+* Add concurrency limits (e.g., semaphore)
+
+---
+
+## 📂 I/O Bound Behavior
+
+Filesystem scanning is heavily I/O-bound:
+
+* Performance depends on disk speed (SSD vs HDD)
+* Metadata calls (`symlink_metadata`) are expensive
+* Network filesystems may dramatically reduce performance
+
+### Potential Improvements
+
+* Batch metadata operations where possible
+* Reduce syscalls
+* Add optional depth limiting
+* Add ignore rules to skip heavy directories
+
+---
+
+## 🧮 Sorting Strategy
+
+`BinaryHeap` ordering currently prioritizes:
+
+1. `size_excluding_max`
+2. `total_size`
+3. `path`
+
+This ordering is more computationally expensive than a simple size comparison.
+
+### Potential Improvements
+
+* Benchmark alternative ordering strategies
+* Make ranking strategy configurable
+* Precompute and cache comparison keys
+
+---
+
+## 🖥️ Scaling Concerns
+
+On very large filesystems (millions of files):
+
+* Heap operations become costly (`O(log n)` per push)
+* Memory pressure increases
+* Async overhead may outweigh benefits
+
+Long-term improvements may include:
+
+* Streaming aggregation
+* Chunked processing
+* Parallel filesystem partitioning
+* Dedicated performance benchmarks
+
+---
+
 ## 🔍 Current Limitations
 
-* Path is hardcoded
-* No CLI arguments
+* Path is hardcoded to `/home`
+* No CLI arguments yet
 * No filtering options
 * No progress reporting
 * No output formatting (raw debug print only)
-* No testing
+* No Windows testing yet
 * No symlink handling beyond skipping
 
 ---
@@ -114,20 +232,20 @@ Scanning
 * [ ] Add ignore patterns (e.g., `.git`, `node_modules`)
 * [ ] Improve performance for extremely large directory trees
 
+### Performance
+
+* [ ] Replace global heap with bounded top-N structure
+* [ ] Reduce lock contention
+* [ ] Add concurrency limits
+* [ ] Add benchmarking suite
+* [ ] Profile with large datasets
+
 ### UX Improvements
 
 * [ ] Pretty terminal output (tables or colors)
 * [ ] Add progress indicator
 * [ ] Add interactive mode
 * [ ] Export results to JSON/CSV
-
-### Architecture
-
-* [ ] Improve collector design (reduce locking contention)
-* [ ] Add configuration struct
-* [ ] Add benchmarking suite
-* [ ] Write unit tests
-* [ ] Add integration tests
 
 ### Cross-Platform
 
