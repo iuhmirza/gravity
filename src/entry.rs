@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Entry {
     path: PathBuf,
     kind: EntryKind,
@@ -17,7 +17,7 @@ impl Entry {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum EntryKind {
     File,
     Directory,
