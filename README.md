@@ -1,7 +1,3 @@
-Here is an updated **README.md** with a dedicated **Performance Considerations & Optimization Opportunities** section added.
-
----
-
 # Gravity 🌌
 
 **Gravity** is a work-in-progress disk usage analyzer written in Rust.
