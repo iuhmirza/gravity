@@ -9,8 +9,8 @@ pub struct Entry {
 }
 
 impl Entry {
-    pub fn new(path: PathBuf, kind: EntryKind, total_size: u64, net_size: u64) -> Entry {
-        Entry {path, kind, total_size, size_excluding_max: net_size}
+    pub fn new(path: PathBuf, kind: EntryKind, total_size: u64, size_excluding_max: u64) -> Entry {
+        Entry {path, kind, total_size, size_excluding_max}
     }
     pub fn size(&self) -> u64 {
         self.total_size
@@ -27,7 +27,6 @@ impl PartialEq for Entry {
     fn eq(&self, other: &Self) -> bool {
         self.size_excluding_max == other.size_excluding_max
             && self.total_size == other.total_size
-            && self.path == other.path
     }
 }
 
@@ -44,6 +43,5 @@ impl Ord for Entry {
         self.size_excluding_max
             .cmp(&other.size_excluding_max)
             .then(self.total_size.cmp(&other.total_size))
-            .then(self.path.cmp(&other.path))
     }
 }

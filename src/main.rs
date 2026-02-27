@@ -1,6 +1,6 @@
-use std::{collections::BinaryHeap, path::Path, sync::Arc};
+use std::{path::Path};
 
-use tokio::sync::Mutex;
+
 
 mod scanner;
 mod entry;
@@ -8,13 +8,14 @@ mod collector;
 
 #[tokio::main]
 async fn main() -> Result<(), std::io::Error>{
-    println!("Scanning...");
-    let collector = Arc::new(Mutex::new(BinaryHeap::new()));
-    scanner::scan(Path::new("/home").to_path_buf(), collector.clone()).await?;
-    let mut collector = collector.lock().await;
-    // for i in 1..=10  {
-    //     let entry = collector.pop().unwrap();
-    //     println!("{i}: {entry:?}")
-    // }
+    let path = Path::new("/home").to_path_buf();
+    let entries = scanner::scan(path.clone()).await?;
+    for (i, entry) in entries.iter().enumerate() {
+        println!("{i}: {entry:?}");
+    }
+    let entries = scanner::scan_sync(path)?;
+    for (i, entry) in entries.iter().enumerate() {
+        println!("{i}: {entry:?}");
+    }
     Ok(())
 }
