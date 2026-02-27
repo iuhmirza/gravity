@@ -1,280 +1,89 @@
 # Gravity 🌌
 
-**Gravity** is a work-in-progress disk usage analyzer written in Rust.
-Its goal is simple: **find the files and folders that take up the most space on your drive**.
+**Gravity** is a high-performance disk space analyzer built in Rust. It is designed to identify files and folders that exert a disproportionate "pull" on your storage—helping you find the bloat that traditional tools might miss.
 
-Gravity recursively scans directories, calculates file and directory sizes, and surfaces the largest space consumers using a priority queue.
+Unlike simple `du` clones, Gravity aims to highlight folders that are heavy not just because of a single massive file, but because of cumulative "disproportionate" growth.
 
----
-
-## ✨ Features (Current)
-
-* 🚀 Asynchronous directory scanning with `tokio`
-* 📁 Recursive traversal of directories
-* 📊 Size aggregation for files and directories
-* 🧠 Uses a `BinaryHeap` to track largest entries
-* 🔝 Displays the top 10 largest entries found
+> [!WARNING]
+> **Status: Work In Progress (WIP)** > This project is currently under active development. The CLI interface and core logic are subject to frequent changes.
 
 ---
 
-## 📦 How It Works
+## 🚀 Features
 
-Gravity scans a directory tree (currently hardcoded to `/home`) and:
-
-1. Walks through all subdirectories.
-2. Collects file sizes.
-3. Aggregates total directory sizes.
-4. Pushes results into a `BinaryHeap`.
-5. Prints the 10 largest entries.
-
-### Directory Size Logic
-
-Each directory stores:
-
-* `total_size` — total size of all contents
-* `size_excluding_max` — total size minus its largest child
-  (used for smarter ordering in the heap)
-
-Entries are ordered by:
-
-1. `size_excluding_max`
-2. `total_size`
-3. `path`
-
-This allows large directories with many moderately large files to surface properly, instead of being dominated by a single huge file.
+* **Dual Scanning Engines:** Includes both a high-concurrency **Asynchronous** scanner (powered by `tokio`) and a standard **Synchronous** scanner for performance comparison.
+* **Smart Collection:** Implements multiple collection strategies (`HeapCollector` and `VecCollector`) to efficiently track the largest entries without consuming excessive memory.
+* **Deep Insights:** Calculates total size and "size excluding the largest element" to help identify directories filled with many medium-sized files (true bloat).
+* **Recursive Traversal:** Safely handles symlinks and directory structures.
 
 ---
 
-## 🧠 Project Structure
+## 📂 Project Structure
 
-```
-src/
-├── main.rs        # Entry point
-├── scanner.rs     # Recursive async directory scanning
-├── entry.rs       # Entry struct + ordering logic
-└── collector.rs   # (Planned / placeholder)
-```
+The project is organized into modular components:
+
+* **`main.rs`**: The entry point that orchestrates the scan and handles the async runtime.
+* **`scanner.rs`**: The core logic for filesystem traversal, implementing both `async` recursive tasks and `sync` loops.
+* **`entry.rs`**: Defines the `Entry` data structure and the `EntryKind` enum. It handles the logic for comparing file "heaviness."
+* **`collector.rs`**: A trait-based system for gathering results.
+* **`HeapCollector`**: Uses a `BinaryHeap` to maintain the top $N$ largest items in $O(\log N)$ time.
+* **`VecCollector`**: A simple vector-based collection for smaller datasets.
+
+
 
 ---
 
-## 🛠️ Installation
+## 🛠️ Getting Started
 
-Make sure you have Rust installed:
+### Prerequisites
 
-```bash
-rustup install stable
-```
+* Rust (Stable)
+* Cargo
+
+### Installation
 
 Clone the repository:
 
 ```bash
 git clone https://github.com/iuhmirza/gravity.git
 cd gravity
+
 ```
 
-Run:
+### Running the Project
+
+Currently, the project is configured to scan the `/home` directory by default. You can run the built-in benchmarks and scanners using:
 
 ```bash
-cargo run --release
+cargo run
+
+```
+
+### Running Tests
+
+Gravity includes tests to compare the accuracy and performance of the different scanning and collection methods:
+
+```bash
+cargo test
+
 ```
 
 ---
 
-## 📄 Example Output
+## 📊 How it Works
 
-```
-Scanning
-1: Entry { path: "...", kind: Directory, total_size: ..., size_excluding_max: ... }
-2: Entry { path: "...", kind: File, total_size: ..., size_excluding_max: ... }
-...
-```
+Gravity doesn't just look at the `total_size`. It focuses on the **size_excluding_max**.
+
+By subtracting the largest single element from a directory's total weight, Gravity identifies folders that are cluttered with numerous files—often a better indicator of "garbage" or cache build-up than a single large ISO or video file.
 
 ---
 
-# ⚡ Performance Considerations & Optimization Opportunities
+## 🏗️ Roadmap
 
-Gravity is designed to scale, but there are important performance considerations in its current implementation.
+* [ ] Add a proper CLI interface using `clap`.
+* [ ] Implement customizable depth limits.
+* [ ] Add more sophisticated "gravity" metrics (weighted bloat scores).
+* [ ] Visual TUI for navigating the filesystem.
 
-## 🔒 Lock Contention
+**Author:** [iuhmirza](https://github.com/iuhmirza)
 
-All entries are pushed into a shared:
-
-```rust
-Arc<Mutex<BinaryHeap<Entry>>>
-```
-
-This means:
-
-* Every file and directory requires acquiring a mutex lock.
-* Large directory trees may cause significant lock contention.
-* Concurrency benefits can be reduced due to synchronization overhead.
-
-### Potential Improvements
-
-* Use a lock-free or sharded structure
-* Maintain thread-local heaps and merge at the end
-* Use a bounded heap that only keeps top N entries
-* Replace `Mutex` with `RwLock` if appropriate
-
----
-
-## 📈 Unbounded Memory Growth
-
-Currently:
-
-* Every file and directory is pushed into the heap
-* Memory usage grows with filesystem size
-
-For very large drives, this can consume substantial RAM.
-
-### Potential Improvements
-
-* Maintain a fixed-size min-heap of top N elements
-* Stream results instead of storing all entries
-* Add size threshold filtering
-
----
-
-## 🧵 Task Spawning Overhead
-
-Each subdirectory spawns a new async task using `JoinSet`.
-
-In very deep or wide directory trees:
-
-* Task creation overhead increases
-* Scheduler pressure increases
-* Stack growth and future boxing adds cost
-
-### Potential Improvements
-
-* Use a bounded task pool
-* Switch to iterative traversal with a work queue
-* Add concurrency limits (e.g., semaphore)
-
----
-
-## 📂 I/O Bound Behavior
-
-Filesystem scanning is heavily I/O-bound:
-
-* Performance depends on disk speed (SSD vs HDD)
-* Metadata calls (`symlink_metadata`) are expensive
-* Network filesystems may dramatically reduce performance
-
-### Potential Improvements
-
-* Batch metadata operations where possible
-* Reduce syscalls
-* Add optional depth limiting
-* Add ignore rules to skip heavy directories
-
----
-
-## 🧮 Sorting Strategy
-
-`BinaryHeap` ordering currently prioritizes:
-
-1. `size_excluding_max`
-2. `total_size`
-3. `path`
-
-This ordering is more computationally expensive than a simple size comparison.
-
-### Potential Improvements
-
-* Benchmark alternative ordering strategies
-* Make ranking strategy configurable
-* Precompute and cache comparison keys
-
----
-
-## 🖥️ Scaling Concerns
-
-On very large filesystems (millions of files):
-
-* Heap operations become costly (`O(log n)` per push)
-* Memory pressure increases
-* Async overhead may outweigh benefits
-
-Long-term improvements may include:
-
-* Streaming aggregation
-* Chunked processing
-* Parallel filesystem partitioning
-* Dedicated performance benchmarks
-
----
-
-## 🔍 Current Limitations
-
-* Path is hardcoded to `/home`
-* No CLI arguments yet
-* No filtering options
-* No progress reporting
-* No output formatting (raw debug print only)
-* No Windows testing yet
-* No symlink handling beyond skipping
-
----
-
-## 🗺️ Roadmap / TODO
-
-### Core Improvements
-
-* [ ] Add CLI argument parsing (scan path, top N results)
-* [ ] Add human-readable size formatting (KB, MB, GB, TB)
-* [ ] Improve error handling and reporting
-* [ ] Add depth limiting
-* [ ] Add ignore patterns (e.g., `.git`, `node_modules`)
-* [ ] Improve performance for extremely large directory trees
-
-### Performance
-
-* [ ] Replace global heap with bounded top-N structure
-* [ ] Reduce lock contention
-* [ ] Add concurrency limits
-* [ ] Add benchmarking suite
-* [ ] Profile with large datasets
-
-### UX Improvements
-
-* [ ] Pretty terminal output (tables or colors)
-* [ ] Add progress indicator
-* [ ] Add interactive mode
-* [ ] Export results to JSON/CSV
-
-### Cross-Platform
-
-* [ ] Windows support testing
-* [ ] macOS testing
-* [ ] Handle platform-specific filesystem quirks
-
----
-
-## 🧪 Why "Gravity"?
-
-Because large files and directories exert **gravitational pull** on your storage.
-
-Gravity helps you find the black holes on your drive before they consume everything.
-
----
-
-## 🤝 Contributing
-
-This project is in early development and open to ideas, refactors, and improvements.
-
-If you'd like to contribute:
-
-1. Fork the repository
-2. Create a feature branch
-3. Submit a pull request
-
----
-
-## 📜 License
-
-TBD
-
----
-
-**Gravity** — Find what’s weighing your storage down.
